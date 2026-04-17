@@ -83,22 +83,6 @@ async function awItemMongo(resp)
   resp.end()
 }
 
-async function awItemShopMongo(resp)
-{
-  const dbconn = await MongoClient.connect(db_url, options);
-  const db = dbconn.db('arcwarrior')
- 
-  console.log('Connected to MongoDB [Arc Warrior Item Shop]')
-
-  const collection = db.collection('item_shop')
-
-  const findResult = await collection.find({}).toArray()
-  resp.write(JSON.stringify(findResult))
-  await dbconn.close()
-
-  resp.end()
-}
-
 async function awItemTypeMongo(resp)
 {
   const dbconn = await MongoClient.connect(db_url, options);
@@ -131,12 +115,147 @@ async function awRarityMongo(resp)
   resp.end()
 }
 
+async function awCardDataMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Card Data]')
+
+  const collection = db.collection('card_data')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
+async function awCardTypeMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Card Type]')
+
+  const collection = db.collection('card_type')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
+async function awGachaCaseMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Gacha Case]')
+
+  const collection = db.collection('gacha_case')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
+async function awGachaCaseItemMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Gacha Case Item]')
+
+  const collection = db.collection('gacha_case_item')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
+async function awMonsterMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Monster]')
+
+  const collection = db.collection('monster')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
+async function awShopItemMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Shop Item]')
+
+  const collection = db.collection('shop_item')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
+async function awShopTypeMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Shop Type]')
+
+  const collection = db.collection('shop_type')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
+async function awStatusMongo(resp)
+{
+  const dbconn = await MongoClient.connect(db_url, options);
+  const db = dbconn.db('arcwarrior')
+ 
+  console.log('Connected to MongoDB [Arc Warrior Status]')
+
+  const collection = db.collection('status')
+
+  const findResult = await collection.find({}).toArray()
+  resp.write(JSON.stringify(findResult))
+  await dbconn.close()
+
+  resp.end()
+}
+
 module.exports = {
   runMongoTest : runMongo,
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
   runMongoAwItem : awItemMongo,
-  runMongoAwItemShop : awItemShopMongo,
   runMongoAwItemType : awItemTypeMongo,
-  runMongoAwRarity : awRarityMongo
+  runMongoAwRarity : awRarityMongo,
+  runMongoAwCardData : awCardDataMongo,
+  runMongoAwCardType : awCardTypeMongo,
+  runMongoAwGachaCase : awGachaCaseMongo,
+  runMongoAwGachaCaseItem : awGachaCaseItemMongo,
+  runMongoAwMonster : awMonsterMongo,
+  runMongoAwShopItem : awShopItemMongo,
+  runMongoAwShopType : awShopTypeMongo,
+  runMongoAwStatus : awStatusMongo
 }
