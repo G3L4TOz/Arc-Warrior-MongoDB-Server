@@ -34,12 +34,6 @@ function onClientRequest(req,resp)
         return
     }
 
-    else if(req.method === 'GET' && pathname === '/api/mongo/item/shop')
-    {
-        mongo.runMongoAwItemShop(resp)
-        return
-    }
-
     else if(req.method === 'GET' && pathname === '/api/mongo/item/type')
     {
         mongo.runMongoAwItemType(resp)
@@ -49,6 +43,54 @@ function onClientRequest(req,resp)
     else if(req.method === 'GET' && pathname === '/api/mongo/rarity')
     {
         mongo.runMongoAwRarity(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/card')
+    {
+        mongo.runMongoAwCardData(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/card/type')
+    {
+        mongo.runMongoAwCardType(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/gacha')
+    {
+        mongo.runMongoAwGachaCase(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/gacha/item')
+    {
+        mongo.runMongoAwGachaCaseItem(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/monster')
+    {
+        mongo.runMongoAwMonster(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/shop/item')
+    {
+        mongo.runMongoAwShopItem(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/shop/type')
+    {
+        mongo.runMongoAwShopType(resp)
+        return
+    }
+
+    else if(req.method === 'GET' && pathname === '/api/mongo/status')
+    {
+        mongo.runMongoAwStatus(resp)
         return
     }
 
