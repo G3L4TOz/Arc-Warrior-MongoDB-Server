@@ -22,12 +22,12 @@ let options = {
 
 async function runMongo()
 {
-    const insertResult = await mongofunc.insert( 'testdb','test', [{ a: 1 }, { a: 2 }, { a: 3 }] )
+    const insertResult = await mongofunc.insert( 'arcwarrior','character', [{ a: 1 }, { a: 2 }, { a: 3 }] )
     console.log( insertResult )
 
-    const updresult  = await mongofunc.update( 'testdb','test', { a:3 }, { $set: { a: 4 , name : "Golf"} } )
-    const remres  = await mongofunc.remove('testdb','test', { a:2 } )
-    const result  = await mongofunc.find('testdb','test',{})
+    const updresult  = await mongofunc.update( 'arcwarrior','character', { a:3 }, { $set: { a: 4 , name : "Golf"} } )
+    const remres  = await mongofunc.remove('arcwarrior','character', { a:2 } )
+    const result  = await mongofunc.find('arcwarrior','character',{})
 
     for (const doc of result) {
         console.log(doc);
