@@ -1,5 +1,6 @@
 const { MongoClient }   = require('mongodb')
 const dns               = require('dns')
+const mongofunc         = require('./mongofunc')
 dns.setServers(['8.8.8.8', '1.1.1.1'])
 
 
@@ -19,20 +20,18 @@ let options = {
     authMechanism: `SCRAM-SHA-1`
 }
 
-async function runMongo(resp)
+async function runMongo()
 {
-  const dbconn = await MongoClient.connect(db_url, options);
-  const db = dbconn.db('arcwarrior')
- 
-  console.log('Connected to MongoDB')
+    const insertResult = await mongofunc.insert( 'testdb','test', [{ a: 1 }, { a: 2 }, { a: 3 }] )
+    console.log( insertResult )
 
-  const collection = db.collection('character')
+    const updresult  = await mongofunc.update( 'testdb','test', { a:3 }, { $set: { a: 4 , name : "Golf"} } )
+    const remres  = await mongofunc.remove('testdb','test', { a:2 } )
+    const result  = await mongofunc.find('testdb','test',{})
 
-  const findResult = await collection.find({}).toArray()
-  resp.write(JSON.stringify(findResult))
-  await dbconn.close()
-
-  resp.end()
+    for (const doc of result) {
+        console.log(doc);
+    }
 }
 
 async function awCharacterMongo(resp)
