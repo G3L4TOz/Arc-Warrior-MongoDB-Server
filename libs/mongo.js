@@ -483,7 +483,7 @@ async function runMongoGachaRoll(req, resp) {
         const dbconn = await MongoClient.connect(db_url, options);
         const db = dbconn.db('arcwarrior');
 
-        const inventory = await db.collection('player_inventory').findOne({ player_id: playerId, item_id: 100 }); // สมมติ 100 คือตั๋ว
+        const inventory = await db.collection('player_inventory').findOne({ player_id: playerId, item_id: 14 })
         if (!inventory || inventory.quantity < rollCount) {
             resp.write(JSON.stringify({ status: "error", message: "Not enough tickets" }));
             await dbconn.close();
@@ -517,7 +517,7 @@ async function runMongoGachaRoll(req, resp) {
                 const hasChar = await db.collection('player_character').findOne({ player_id: playerId, character_id: itemInfo.character_id });
                 if (hasChar) {
                     isDuplicate = true;
-                    rewardToken = selected.rarity * 5; // Logic คำนวณ token
+                    rewardToken = selected.rarity * 5;
                     await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: rewardToken } });
                 } else {
                     await db.collection('player_character').insertOne({ player_id: playerId, character_id: itemInfo.character_id, level: 1, tier: 0 });
