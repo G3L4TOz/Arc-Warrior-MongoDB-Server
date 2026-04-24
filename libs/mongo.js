@@ -412,5 +412,5 @@ module.exports = {
   runMongoLogin : runMongoLogin,
   runMongoRegister : runMongoRegister,
         runMongoGetPlayer : runMongoGetPlayer,
-        runMongoGetInventory : runMongoGetInventory,
+        runMongoGetInventory : runMongoGetInventory
 }
