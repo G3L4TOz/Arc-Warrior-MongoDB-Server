@@ -483,81 +483,144 @@ async function runMongoGachaRoll(req, resp) {
             const dbconn = await MongoClient.connect(db_url, options);
             const db = dbconn.db('arcwarrior');
 
-            const ticketId = 14; 
-            const inventory = await db.collection('inventory').findOne({ player_id: playerId, item_id: ticketId });
-            
-            if (!inventory || inventory.quantity < rollCount) {
-                resp.writeHead(400, { 'Content-Type': 'application/json' });
-                resp.write(JSON.stringify({ status: "error", message: "ตั๋วไม่พอ" }));
+            const ticketItemId = 14;
+
+            const ticket = await db.collection('player_inventory').findOne({
+                player_id: playerId,
+                item_id: ticketItemId
+            });
+
+            if (!ticket || ticket.quantity < rollCount) {
+                resp.write(JSON.stringify({ status: "error", message: "ticket_not_enough" }));
                 await dbconn.close();
                 resp.end();
                 return;
             }
 
-            const gachaItems = await db.collection('gacha_case_item').find({ case_id: caseId }).toArray();
-            const rollResults = [];
+            const pool = await db.collection('gacha_case_item')
+                .find({ case_id: caseId }).toArray();
+
+            const results = [];
+
+            let hasEpic = false;
 
             for (let i = 0; i < rollCount; i++) {
-                let total = 0;
-                gachaItems.forEach(item => total += item.percentage);
-                let roll = Math.random() * total;
-                let sum = 0;
-                let selected = gachaItems[0];
 
-                for (let item of gachaItems) {
-                    sum += item.percentage;
-                    if (roll <= sum) {
-                        selected = item;
-                        break;
+                let selected;
+
+                if (rollCount === 10 && i === 9 && !hasEpic) {
+                    const epicPool = pool.filter(x => x.rarity >= 4);
+                    selected = epicPool[Math.floor(Math.random() * epicPool.length)];
+                }
+                else {
+                    let total = 0;
+                    pool.forEach(p => total += p.percentage);
+
+                    let rand = Math.random() * total;
+                    let sum = 0;
+
+                    for (let p of pool) {
+                        sum += p.percentage;
+                        if (rand <= sum) {
+                            selected = p;
+                            break;
+                        }
                     }
                 }
 
-                const itemMaster = await db.collection('item').findOne({ item_id: selected.item_id });
-                let isDup = false;
-                let tAmount = 0;
+                if (selected.rarity >= 4) {
+                    hasEpic = true;
+                }
 
-                if (itemMaster.item_type_id === 2) {
-                    const hasChar = await db.collection('player_character').findOne({ 
-                        player_id: playerId, 
-                        character_id: itemMaster.character_id 
+                const itemData = await db.collection('item')
+                    .findOne({ item_id: selected.item_id });
+
+                let isDup = false;
+                let tokenGain = 0;
+
+                if (itemData.item_type_id === 2) {
+
+                    const exist = await db.collection('player_character').findOne({
+                        player_id: playerId,
+                        character_id: itemData.character_id
                     });
 
-                    if (hasChar) {
+                    if (exist) {
                         isDup = true;
-                        tAmount = selected.rarity * 5;
-                        await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: tAmount } });
-                    } else {
-                        await db.collection('player_character').insertOne({ 
-                            player_id: playerId, 
-                            character_id: itemMaster.character_id, 
-                            level: 1, 
-                            tier: 0 
+
+                        const rarityData = await db.collection('rarity')
+                            .findOne({ rarity_id: itemData.rarity_id });
+
+                        tokenGain = rarityData.value * 5;
+
+                        await db.collection('player').updateOne(
+                            { player_id: playerId },
+                            { $inc: { token: tokenGain } }
+                        );
+                    }
+                    else {
+                        await db.collection('player_character').insertOne({
+                            player_id: playerId,
+                            character_id: itemData.character_id,
+                            level: 1,
+                            tier: 0
                         });
                     }
-                } else {
-                    await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: 1 } });
+                }
+                else if (itemData.item_type_id === 1) {
+
+                    if (itemData.item_name === "gold") {
+                        await db.collection('player').updateOne(
+                            { player_id: playerId },
+                            { $inc: { gold: 100 } }
+                        );
+                    }
+
+                    if (itemData.item_name === "diamond") {
+                        await db.collection('player').updateOne(
+                            { player_id: playerId },
+                            { $inc: { diamond: 10 } }
+                        );
+                    }
+
+                    if (itemData.item_name === "token") {
+                        await db.collection('player').updateOne(
+                            { player_id: playerId },
+                            { $inc: { token: 1 } }
+                        );
+                    }
+                }
+                else {
+                    await db.collection('player_inventory').updateOne(
+                        { player_id: playerId, item_id: selected.item_id },
+                        { $inc: { quantity: 1 } },
+                        { upsert: true }
+                    );
                 }
 
-                rollResults.push({
+                results.push({
                     item_id: selected.item_id,
+                    item_type: itemData.item_type_id,
+                    rarity: selected.rarity,
                     is_duplicate: isDup,
-                    token_amount: tAmount
+                    token_amount: tokenGain
                 });
             }
 
-            // 3. หักตั๋ว
-            await db.collection('inventory').updateOne(
-                { player_id: playerId, item_id: ticketId }, 
+            await db.collection('player_inventory').updateOne(
+                { player_id: playerId, item_id: ticketItemId },
                 { $inc: { quantity: -rollCount } }
             );
 
-            resp.writeHead(200, { 'Content-Type': 'application/json' });
-            resp.write(JSON.stringify(rollResults));
+            resp.write(JSON.stringify({
+                status: "success",
+                results: results
+            }));
+
             await dbconn.close();
             resp.end();
 
         } catch (err) {
-            resp.writeHead(500, { 'Content-Type': 'application/json' });
             resp.write(JSON.stringify({ status: "error", message: err.message }));
             resp.end();
         }
