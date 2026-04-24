@@ -1,6 +1,5 @@
 const { MongoClient }   = require('mongodb')
 const dns               = require('dns')
-// const mongofunc         = require('./mongofunc')
 dns.setServers(['8.8.8.8', '1.1.1.1'])
 
 
@@ -19,20 +18,6 @@ let options = {
     auth: authuser ,
     authMechanism: `SCRAM-SHA-1`
 }
-
-// async function runMongo()
-// {
-//     const insertResult = await mongofunc.insert( 'arcwarrior','character', [{ a: 1 }, { a: 2 }, { a: 3 }] )
-//     console.log( insertResult )
-
-//     const updresult  = await mongofunc.update( 'arcwarrior','character', { a:3 }, { $set: { a: 4 , name : "Golf"} } )
-//     const remres  = await mongofunc.remove('arcwarrior','character', { a:2 } )
-//     const result  = await mongofunc.find('arcwarrior','character',{})
-
-//     for (const doc of result) {
-//         console.log(doc);
-//     }
-// }
 
 async function awCharacterMongo(resp)
 {
@@ -261,6 +246,49 @@ function getRequestBody(req)
     })
 }
 
+async function runMongoLogin(req, resp)
+{
+    try {
+        const body = await getRequestBody(req)
+
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior')
+
+        const collection = db.collection('player')
+
+        const user = await collection.findOne({
+            username: body.username,
+            password: body.password
+        })
+
+        if (user)
+        {
+            resp.write(JSON.stringify({
+                success: true,
+                data: {
+                    player_id: user.player_id,
+                    username: user.username,
+                    nickname: user.nickname,
+                    level: user.level
+                }
+            }))
+        }
+        else
+        {
+            resp.write(JSON.stringify({ success: false }))
+        }
+
+        await dbconn.close()
+        resp.end()
+    }
+    catch (err)
+    {
+        console.error(err)
+        resp.write(JSON.stringify({ success: false }))
+        resp.end()
+    }
+}
+
 async function runMongoRegister(req, resp)
 {
     try {
@@ -314,7 +342,6 @@ async function runMongoRegister(req, resp)
 }
 
 module.exports = {
-  runMongoTest : runMongo,
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
   runMongoAwItem : awItemMongo,
