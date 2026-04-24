@@ -130,7 +130,7 @@ function onClientRequest(req,resp)
         return
     }
 
-    else if(req.method === 'GET' && pathname === '/api/mongo/character/update')
+    else if(req.method === 'POST' && pathname === '/api/mongo/character/update')
     {
         mongo.runMongoUpdateCharacter(req, resp)
         return
