@@ -395,6 +395,47 @@ async function runMongoGetInventory(req, resp)
     resp.end()
 }
 
+async function runMongoUpdateCurrency(req, resp) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        const data = JSON.parse(body);
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior');
+        
+        await db.collection('player').updateOne(
+            { player_id: parseInt(data.player_id) },
+            { $set: { gold: data.gold, diamond: data.diamond, token: data.token } }
+        );
+
+        resp.write(JSON.stringify({ status: "success" }));
+        await dbconn.close();
+        resp.end();
+    });
+}
+
+// ฟังก์ชันสำหรับเพิ่มไอเทม (ถ้ามีอยู่แล้วให้เพิ่มจำนวน ถ้าไม่มีให้ Insert ใหม่)
+async function runMongoAddItem(req, resp) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        const data = JSON.parse(body);
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior');
+        
+        // ใช้ upsert: true เพื่อที่ว่าถ้ายังไม่มีไอเทมนี้ในตัว จะได้สร้าง row ใหม่เลย
+        await db.collection('inventory').updateOne(
+            { player_id: parseInt(data.player_id), item_id: parseInt(data.item_id) },
+            { $inc: { quantity: parseInt(data.quantity) } }, // $inc คือการบวกเพิ่มจากค่าเดิม
+            { upsert: true }
+        );
+
+        resp.write(JSON.stringify({ status: "success" }));
+        await dbconn.close();
+        resp.end();
+    });
+}
+
 module.exports = {
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
@@ -409,8 +450,10 @@ module.exports = {
   runMongoAwShopItem : awShopItemMongo,
   runMongoAwShopType : awShopTypeMongo,
   runMongoAwStatus : awStatusMongo,
-  runMongoLogin : runMongoLogin,
-  runMongoRegister : runMongoRegister,
-        runMongoGetPlayer : runMongoGetPlayer,
-        runMongoGetInventory : runMongoGetInventory
+  runMongoLogin,
+  runMongoRegister,
+  runMongoGetPlayer,
+  runMongoGetInventory,
+  runMongoUpdateCurrency,
+  runMongoAddItem
 }
