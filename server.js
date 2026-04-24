@@ -106,6 +106,12 @@ function onClientRequest(req,resp)
         return
     }
 
+    else if(req.method === 'GET' && pathname === '/api/mongo/inventory')
+    {
+        mongo.runMongoGetInventory(req, resp)
+        return
+    }
+
     else
     resp.write(JSON.stringify({messages: [
             '[Arc Warrior Mongo DB]'
