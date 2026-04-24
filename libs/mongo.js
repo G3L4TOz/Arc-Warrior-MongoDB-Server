@@ -515,7 +515,7 @@ async function runMongoGachaRoll(req, resp) {
             let rolledResults = [];
             let hasEpic = false;
 
-            // 3. เริ่มสุ่ม (ถ้าสุ่ม 10 จะสุ่มปกติ 9 ครั้งเพื่อรอการันตีใบที่ 10)
+            // 3. เริ่มสุ่ม
             const countToRoll = roll_count === 10 ? 9 : roll_count;
             for (let i = 0; i < countToRoll; i++) {
                 let r = weightedRandom(pool);
@@ -536,56 +536,74 @@ async function runMongoGachaRoll(req, resp) {
             // 4. บันทึกผลและตรวจสอบของซ้ำ
             let finalRewards = [];
             for (let res of rolledResults) {
-                const itemData = await db.collection('item').findOne({ item_id: res.item_id });
+                // ดึงข้อมูลพื้นฐานของไอเทม
+                const itemData = await db.collection('item').findOne({ item_id: parseInt(res.item_id) });
                 let isDuplicate = false;
                 let tokenGained = 0;
 
+                // เตรียมข้อมูลที่จะส่งกลับ Unity
                 let itemToReturn = {
-                        item_id: itemData.item_id,
-                        item_name: itemData.item_name,
-                        item_type_id: itemData.item_type_id,
-                        rarity: 0,     // เดี๋ยวจะเอาจาก character มาใส่
-                        character_id: 0,
-                        element_id: 0
+                    item_id: itemData.item_id,
+                    item_name: itemData.item_name,
+                    item_type_id: itemData.item_type_id,
+                    rarity: 0,
+                    character_id: 0,
+                    element_id: 0
                 };
 
-                if (itemData.item_type_id === 2) { // ถ้าเป็นตัวละคร
-        // ไปหาข้อมูลใน table character โดยใช้ item_id
-                        const charData = await db.collection('character').findOne({ item_id: itemData.item_id });
+                // ถ้าเป็นตัวละคร (Type 2)
+                if (itemData.item_type_id === 2) {
+                    // ไปหา character_id จาก table character โดยใช้ item_id
+                    const charData = await db.collection('character').findOne({ item_id: parseInt(itemData.item_id) });
+                    
+                    if (charData) {
+                        itemToReturn.character_id = charData.character_id;
+                        itemToReturn.rarity = charData.rarity_id;
+                        itemToReturn.element_id = charData.element_id;
                         
-                        if (charData) {
-                            itemToReturn.character_id = charData.character_id;
-                            itemToReturn.rarity = charData.rarity_id; // Mapping rarity_id -> rarity
-                            itemToReturn.element_id = charData.element_id;
-                        }
-                
+                        console.log(`[Gacha] Success: Joined Character ID ${itemToReturn.character_id} for Item ${itemToReturn.item_name}`);
+                    } else {
+                        console.error(`[Gacha] Error: No character data found for item_id ${itemData.item_id}`);
+                    }
+            
+                    // เช็คของซ้ำ (ต้องมี character_id ก่อน)
+                    if (itemToReturn.character_id !== 0) {
                         const existingChar = await db.collection('player_character').findOne({ 
                             player_id: parseInt(player_id), 
-                            character_id: itemToReturn.character_id 
+                            character_id: parseInt(itemToReturn.character_id) 
                         });
                 
                         if (existingChar) {
                             isDuplicate = true;
                             tokenGained = getWeightToken(res.rarity);
-                            await db.collection('player').updateOne({ player_id: parseInt(player_id) }, { $inc: { token: tokenGained } });
+                            await db.collection('player').updateOne(
+                                { player_id: parseInt(player_id) }, 
+                                { $inc: { token: tokenGained } }
+                            );
                         } else {
+                            // เพิ่มตัวละครเข้าฐานข้อมูล
                             await db.collection('player_character').insertOne({ 
                                 player_id: parseInt(player_id), 
-                                character_id: itemToReturn.character_id, 
+                                character_id: parseInt(itemToReturn.character_id), 
                                 level: 1, 
                                 tier: 0 
                             });
                         }
+                    }
                 } else if (itemData.item_type_id === 1) { // Type: Currency
-                    // สมมติว่าถ้าได้ไอเทมเงิน ให้บวกเข้า player table โดยตรง
                     itemToReturn.rarity = res.rarity;
+                    // อัปเดตเงินผู้เล่น (ถ้ามี logic เพิ่มเติมใส่ตรงนี้)
+                    await db.collection('player').updateOne(
+                        { player_id: parseInt(player_id) }, 
+                        { $inc: { gold: 100 } }
+                    );
                 }
 
                 finalRewards.push({
-                        item: itemToReturn,
-                        isDuplicate: isDuplicate,
-                        rarity: res.rarity,
-                        tokenAmount: tokenGained
+                    item: itemToReturn,
+                    isDuplicate: isDuplicate,
+                    rarity: res.rarity,
+                    tokenAmount: tokenGained
                 });
             }
 
@@ -595,10 +613,11 @@ async function runMongoGachaRoll(req, resp) {
                 { $inc: { quantity: -roll_count } }
             );
 
+            // ส่งข้อมูลทั้งหมดกลับไปที่ Unity
             resp.write(JSON.stringify({ success: true, data: finalRewards }));
 
         } catch (err) {
-            console.error(err);
+            console.error("[Gacha API Error]:", err);
             resp.write(JSON.stringify({ success: false, message: err.message }));
         } finally {
             await dbconn.close();
@@ -606,7 +625,6 @@ async function runMongoGachaRoll(req, resp) {
         }
     });
 }
-
 
 module.exports = {
   runMongoAwCharacter : awCharacterMongo,
