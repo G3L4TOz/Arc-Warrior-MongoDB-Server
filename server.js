@@ -10,12 +10,6 @@ function onClientRequest(req,resp)
 
     resp.writeHead(200, { 'Content-Type' : 'application/json' })
 
-    // if(req.method === 'GET' && pathname === '/api/mongo/test')
-    // {
-    //     mongo.runMongoTest(resp)
-    //     return
-    // }
-
     if(req.method === 'GET' && pathname === '/api/mongo/character')
     {
         mongo.runMongoAwCharacter(resp)
