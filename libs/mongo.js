@@ -536,45 +536,50 @@ async function runMongoGachaRoll(req, resp) {
             // 4. บันทึกผลและตรวจสอบของซ้ำ
             let finalRewards = [];
             for (let res of rolledResults) {
-                // ดึงข้อมูลพื้นฐานของไอเทม
+                // บังคับหา item_id เป็นตัวเลข
                 const itemData = await db.collection('item').findOne({ item_id: parseInt(res.item_id) });
+                
+                if (!itemData) {
+                    console.error(`[GACHA] Error: Item ID ${res.item_id} not found in 'item' table!`);
+                    continue;
+                }
+
                 let isDuplicate = false;
                 let tokenGained = 0;
 
-                // เตรียมข้อมูลที่จะส่งกลับ Unity
+                // ประกอบร่างข้อมูลพื้นฐาน (บังคับทุก ID เป็น Number)
                 let itemToReturn = {
-                    item_id: itemData.item_id,
+                    item_id: parseInt(itemData.item_id),
                     item_name: itemData.item_name,
-                    item_type_id: itemData.item_type_id,
-                    rarity: 0,
+                    item_type_id: parseInt(itemData.item_type_id),
+                    rarity: parseInt(res.rarity), // ใช้ rarity จากตู้สุ่มเป็นค่าหลัก
                     character_id: 0,
                     element_id: 0
                 };
 
-                // ถ้าเป็นตัวละคร (Type 2)
-                if (itemData.item_type_id === 2) {
-                    // ไปหา character_id จาก table character โดยใช้ item_id
+                // ตรวจสอบเงื่อนไขตัวละคร (เช็คได้ทั้งเลข 2 และสตริง "2")
+                if (itemToReturn.item_type_id == 2) {
+                    // ค้นหาใน table character โดยใช้ item_id
                     const charData = await db.collection('character').findOne({ 
-                        item_id: parseInt(itemData.item_id) 
+                        item_id: parseInt(itemToReturn.item_id) 
                     });
                     
                     if (charData) {
-                        itemToReturn.character_id = charData.character_id; 
-                        itemToReturn.rarity = charData.rarity_id;
-                        itemToReturn.element_id = charData.element_id;
-
-                        console.log(`[DEBUG] Found CharID: ${charData.character_id} for ItemID: ${itemData.item_id}`);
-                        console.log(`[Gacha] Success: Joined Character ID ${itemToReturn.character_id} for Item ${itemToReturn.item_name}`);
+                        // ดึงค่าตามชื่อฟิลด์ใน MongoDB ของคุณเป๊ะๆ
+                        itemToReturn.character_id = parseInt(charData.character_id);
+                        itemToReturn.rarity = parseInt(charData.rarity_id);
+                        itemToReturn.element_id = parseInt(charData.element_id);
+                        
+                        console.log(`[GACHA] Linked Success: ${itemToReturn.item_name} -> CharID: ${itemToReturn.character_id}`);
                     } else {
-                        console.error(`[Gacha] Error: No character data found for item_id ${itemData.item_id}`);
-                        console.log(`[DEBUG] Character not found for ItemID: ${itemData.item_id}`);
+                        console.warn(`[GACHA] Found ItemType 2 but NO Data in 'character' table for ItemID: ${itemToReturn.item_id}`);
                     }
             
-                    // เช็คของซ้ำ (ต้องมี character_id ก่อน)
-                    if (itemToReturn.character_id !== 0) {
+                    // เช็คของซ้ำ (ถ้ามี character_id แล้ว)
+                    if (itemToReturn.character_id > 0) {
                         const existingChar = await db.collection('player_character').findOne({ 
                             player_id: parseInt(player_id), 
-                            character_id: parseInt(itemToReturn.character_id) 
+                            character_id: itemToReturn.character_id 
                         });
                 
                         if (existingChar) {
@@ -585,18 +590,16 @@ async function runMongoGachaRoll(req, resp) {
                                 { $inc: { token: tokenGained } }
                             );
                         } else {
-                            // เพิ่มตัวละครเข้าฐานข้อมูล
                             await db.collection('player_character').insertOne({ 
                                 player_id: parseInt(player_id), 
-                                character_id: parseInt(itemToReturn.character_id), 
+                                character_id: itemToReturn.character_id, 
                                 level: 1, 
                                 tier: 0 
                             });
                         }
                     }
-                } else if (itemData.item_type_id === 1) { // Type: Currency
-                    itemToReturn.rarity = res.rarity;
-                    // อัปเดตเงินผู้เล่น (ถ้ามี logic เพิ่มเติมใส่ตรงนี้)
+                } else if (itemToReturn.item_type_id == 1) {
+                    // ถ้าเป็น Currency (Token) ให้บวกเงินผู้เล่นตามความเหมาะสม
                     await db.collection('player').updateOne(
                         { player_id: parseInt(player_id) }, 
                         { $inc: { gold: 100 } }
@@ -606,7 +609,7 @@ async function runMongoGachaRoll(req, resp) {
                 finalRewards.push({
                     item: itemToReturn,
                     isDuplicate: isDuplicate,
-                    rarity: res.rarity,
+                    rarity: parseInt(res.rarity),
                     tokenAmount: tokenGained
                 });
             }
