@@ -424,7 +424,7 @@ async function runMongoAddItem(req, resp) {
         const db = dbconn.db('arcwarrior');
         
         // ใช้ upsert: true เพื่อที่ว่าถ้ายังไม่มีไอเทมนี้ในตัว จะได้สร้าง row ใหม่เลย
-        await db.collection('inventory').updateOne(
+        await db.collection('player_inventory').updateOne(
             { player_id: parseInt(data.player_id), item_id: parseInt(data.item_id) },
             { $inc: { quantity: parseInt(data.quantity) } }, // $inc คือการบวกเพิ่มจากค่าเดิม
             { upsert: true }
