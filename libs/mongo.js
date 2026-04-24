@@ -436,25 +436,19 @@ async function runMongoAddItem(req, resp) {
     });
 }
 
-async function runMongoUpdateCharacter(req, resp) {
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', async () => {
-        const data = JSON.parse(body);
-        const dbconn = await MongoClient.connect(db_url, options);
-        const db = dbconn.db('arcwarrior');
-        
-        // อัปเดตทั้ง level และ tier ในคำสั่งเดียว
-        await db.collection('player_character').updateOne(
-            { player_id: parseInt(data.player_id), character_id: parseInt(data.character_id) },
-            { $set: { level: parseInt(data.level), tier: parseInt(data.tier) } },
-            { upsert: true }
-        );
+async function runMongoGetPlayerCharacters(req, resp) {
+    const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    const playerId = parseInt(urlParams.get('player_id'));
 
-        resp.write(JSON.stringify({ status: "success" }));
-        await dbconn.close();
-        resp.end();
-    });
+    const dbconn = await MongoClient.connect(db_url, options);
+    const db = dbconn.db('arcwarrior');
+    
+    // ดึงเฉพาะตัวละครที่ player_id นี้เป็นเจ้าของ
+    const characters = await db.collection('player_character').find({ player_id: playerId }).toArray();
+    
+    resp.write(JSON.stringify(characters));
+    await dbconn.close();
+    resp.end();
 }
 
 module.exports = {
@@ -477,5 +471,5 @@ module.exports = {
   runMongoGetInventory,
   runMongoUpdateCurrency,
   runMongoAddItem,
-  runMongoUpdateCharacter
+  runMongoGetPlayerCharacters
 }
