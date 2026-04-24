@@ -554,17 +554,20 @@ async function runMongoGachaRoll(req, resp) {
                 // ถ้าเป็นตัวละคร (Type 2)
                 if (itemData.item_type_id === 2) {
                     // ไปหา character_id จาก table character โดยใช้ item_id
-                    const charData = await db.collection('character').findOne({ item_id: parseInt(itemData.item_id) });
-                    console.log("DEBUG DB RESULT:", charData);
+                    const charData = await db.collection('character').findOne({ 
+                        item_id: parseInt(itemData.item_id) 
+                    });
                     
                     if (charData) {
-                        itemToReturn.character_id = charData.character_id;
+                        itemToReturn.character_id = charData.character_id; 
                         itemToReturn.rarity = charData.rarity_id;
                         itemToReturn.element_id = charData.element_id;
-                        
+
+                        console.log(`[DEBUG] Found CharID: ${charData.character_id} for ItemID: ${itemData.item_id}`);
                         console.log(`[Gacha] Success: Joined Character ID ${itemToReturn.character_id} for Item ${itemToReturn.item_name}`);
                     } else {
                         console.error(`[Gacha] Error: No character data found for item_id ${itemData.item_id}`);
+                        console.log(`[DEBUG] Character not found for ItemID: ${itemData.item_id}`);
                     }
             
                     // เช็คของซ้ำ (ต้องมี character_id ก่อน)
