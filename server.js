@@ -112,6 +112,18 @@ function onClientRequest(req,resp)
         return
     }
 
+    else if(req.method === 'POST' && pathname === '/api/mongo/update-currency')
+    {
+        mongo.runMongoUpdateCurrency(req, resp)
+        return
+    }
+
+    else if(req.method === 'POST' && pathname === '/api/mongo/inventory/add')
+    {
+        mongo.runMongoAddItem(req, resp)
+        return
+    }
+
     else
     resp.write(JSON.stringify({messages: [
             '[Arc Warrior Mongo DB]'
