@@ -1,6 +1,6 @@
 const { MongoClient }   = require('mongodb')
 const dns               = require('dns')
-const mongofunc         = require('./mongofunc')
+// const mongofunc         = require('./mongofunc')
 dns.setServers(['8.8.8.8', '1.1.1.1'])
 
 
@@ -20,19 +20,19 @@ let options = {
     authMechanism: `SCRAM-SHA-1`
 }
 
-async function runMongo()
-{
-    const insertResult = await mongofunc.insert( 'arcwarrior','character', [{ a: 1 }, { a: 2 }, { a: 3 }] )
-    console.log( insertResult )
+// async function runMongo()
+// {
+//     const insertResult = await mongofunc.insert( 'arcwarrior','character', [{ a: 1 }, { a: 2 }, { a: 3 }] )
+//     console.log( insertResult )
 
-    const updresult  = await mongofunc.update( 'arcwarrior','character', { a:3 }, { $set: { a: 4 , name : "Golf"} } )
-    const remres  = await mongofunc.remove('arcwarrior','character', { a:2 } )
-    const result  = await mongofunc.find('arcwarrior','character',{})
+//     const updresult  = await mongofunc.update( 'arcwarrior','character', { a:3 }, { $set: { a: 4 , name : "Golf"} } )
+//     const remres  = await mongofunc.remove('arcwarrior','character', { a:2 } )
+//     const result  = await mongofunc.find('arcwarrior','character',{})
 
-    for (const doc of result) {
-        console.log(doc);
-    }
-}
+//     for (const doc of result) {
+//         console.log(doc);
+//     }
+// }
 
 async function awCharacterMongo(resp)
 {
