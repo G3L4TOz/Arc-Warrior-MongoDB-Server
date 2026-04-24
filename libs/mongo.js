@@ -377,6 +377,24 @@ async function runMongoGetPlayer(req, resp)
     }
 }
 
+async function runMongoGetInventory(req, resp)
+{
+    const url = new URL(req.url, `http://${req.headers.host}`)
+    const player_id = parseInt(url.searchParams.get("player_id"))
+
+    const dbconn = await MongoClient.connect(db_url, options);
+    const db = dbconn.db('arcwarrior')
+
+    const collection = db.collection('player_inventory')
+
+    const result = await collection.find({ player_id: player_id }).toArray()
+
+    resp.write(JSON.stringify(result))
+
+    await dbconn.close()
+    resp.end()
+}
+
 module.exports = {
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
@@ -393,5 +411,6 @@ module.exports = {
   runMongoAwStatus : awStatusMongo,
   runMongoLogin : runMongoLogin,
   runMongoRegister : runMongoRegister,
-        runMongoGetPlayer : runMongoGetPlayer
+        runMongoGetPlayer : runMongoGetPlayer,
+        runMongoGetInventory : runMongoGetInventory,
 }
