@@ -483,7 +483,7 @@ async function runMongoGachaRoll(req, resp) {
         const dbconn = await MongoClient.connect(db_url, options);
         const db = dbconn.db('arcwarrior');
 
-        const inventory = await db.collection('inventory').findOne({ player_id: playerId, item_id: 100 }); // สมมติ 100 คือตั๋ว
+        const inventory = await db.collection('player_inventory').findOne({ player_id: playerId, item_id: 100 }); // สมมติ 100 คือตั๋ว
         if (!inventory || inventory.quantity < rollCount) {
             resp.write(JSON.stringify({ status: "error", message: "Not enough tickets" }));
             await dbconn.close();
@@ -533,7 +533,7 @@ async function runMongoGachaRoll(req, resp) {
             });
         }
 
-        await db.collection('inventory').updateOne({ player_id: playerId, item_id: 100 }, { $inc: { quantity: -rollCount } });
+        await db.collection('player_inventory').updateOne({ player_id: playerId, item_id: 100 }, { $inc: { quantity: -rollCount } });
         
         resp.write(JSON.stringify(results));
         await dbconn.close();
