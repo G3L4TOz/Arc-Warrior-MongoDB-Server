@@ -471,6 +471,76 @@ async function runMongoUpdateCharacter(req, resp) {
     });
 }
 
+async function runMongoGachaRoll(req, resp) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        const data = JSON.parse(body);
+        const playerId = parseInt(data.player_id);
+        const caseId = parseInt(data.case_id);
+        const rollCount = parseInt(data.count);
+
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior');
+
+        const inventory = await db.collection('inventory').findOne({ player_id: playerId, item_id: 100 }); // สมมติ 100 คือตั๋ว
+        if (!inventory || inventory.quantity < rollCount) {
+            resp.write(JSON.stringify({ status: "error", message: "Not enough tickets" }));
+            await dbconn.close();
+            resp.end();
+            return;
+        }
+
+        const gachaItems = await db.collection('gacha_case_item').find({ case_id: caseId }).toArray();
+        const results = [];
+
+        for (let i = 0; i < rollCount; i++) {
+            let total = 0;
+            gachaItems.forEach(item => total += item.percentage);
+            let roll = Math.random() * total;
+            let sum = 0;
+            let selected = gachaItems[0];
+
+            for (let item of gachaItems) {
+                sum += item.percentage;
+                if (roll <= sum) {
+                    selected = item;
+                    break;
+                }
+            }
+
+            const itemInfo = await db.collection('item').findOne({ item_id: selected.item_id });
+            let isDuplicate = false;
+            let rewardToken = 0;
+
+            if (itemInfo.item_type_id === 2) {
+                const hasChar = await db.collection('player_character').findOne({ player_id: playerId, character_id: itemInfo.character_id });
+                if (hasChar) {
+                    isDuplicate = true;
+                    rewardToken = selected.rarity * 5; // Logic คำนวณ token
+                    await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: rewardToken } });
+                } else {
+                    await db.collection('player_character').insertOne({ player_id: playerId, character_id: itemInfo.character_id, level: 1, tier: 0 });
+                }
+            } else {
+                await db.collection('player').updateOne({ player_id: playerId }, { $inc: { gold: 100 } });
+            }
+
+            results.push({
+                item_id: selected.item_id,
+                is_duplicate: isDuplicate,
+                token_amount: rewardToken
+            });
+        }
+
+        await db.collection('inventory').updateOne({ player_id: playerId, item_id: 100 }, { $inc: { quantity: -rollCount } });
+        
+        resp.write(JSON.stringify(results));
+        await dbconn.close();
+        resp.end();
+    });
+}
+
 module.exports = {
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
@@ -492,5 +562,6 @@ module.exports = {
   runMongoUpdateCurrency,
   runMongoAddItem,
   runMongoGetPlayerCharacters,
-  runMongoUpdateCharacter
+  runMongoUpdateCharacter,
+  runMongoGachaRoll
 }
