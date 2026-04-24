@@ -540,34 +540,52 @@ async function runMongoGachaRoll(req, resp) {
                 let isDuplicate = false;
                 let tokenGained = 0;
 
-                if (itemData.item_type_id === 2) { // Type: Character
-                    const existingChar = await db.collection('player_character').findOne({ 
-                        player_id: parseInt(player_id), 
-                        character_id: itemData.character_id 
-                    });
+                let itemToReturn = {
+                        item_id: itemData.item_id,
+                        item_name: itemData.item_name,
+                        item_type_id: itemData.item_type_id,
+                        rarity: 0,     // เดี๋ยวจะเอาจาก character มาใส่
+                        character_id: 0,
+                        element_id: 0
+                };
 
-                    if (existingChar) {
-                        isDuplicate = true;
-                        tokenGained = getWeightToken(res.rarity);
-                        await db.collection('player').updateOne({ player_id: parseInt(player_id) }, { $inc: { token: tokenGained } });
-                    } else {
-                        await db.collection('player_character').insertOne({ 
+                if (itemData.item_type_id === 2) { // ถ้าเป็นตัวละคร
+        // ไปหาข้อมูลใน table character โดยใช้ item_id
+                        const charData = await db.collection('character').findOne({ item_id: itemData.item_id });
+                        
+                        if (charData) {
+                            itemToReturn.character_id = charData.character_id;
+                            itemToReturn.rarity = charData.rarity_id; // Mapping rarity_id -> rarity
+                            itemToReturn.element_id = charData.element_id;
+                        }
+                
+                        const existingChar = await db.collection('player_character').findOne({ 
                             player_id: parseInt(player_id), 
-                            character_id: itemData.character_id, 
-                            level: 1, 
-                            tier: 0 
+                            character_id: itemToReturn.character_id 
                         });
-                    }
+                
+                        if (existingChar) {
+                            isDuplicate = true;
+                            tokenGained = getWeightToken(res.rarity);
+                            await db.collection('player').updateOne({ player_id: parseInt(player_id) }, { $inc: { token: tokenGained } });
+                        } else {
+                            await db.collection('player_character').insertOne({ 
+                                player_id: parseInt(player_id), 
+                                character_id: itemToReturn.character_id, 
+                                level: 1, 
+                                tier: 0 
+                            });
+                        }
                 } else if (itemData.item_type_id === 1) { // Type: Currency
                     // สมมติว่าถ้าได้ไอเทมเงิน ให้บวกเข้า player table โดยตรง
-                    await db.collection('player').updateOne({ player_id: parseInt(player_id) }, { $inc: { gold: 100 } }); 
+                    itemToReturn.rarity = res.rarity;
                 }
 
                 finalRewards.push({
-                    item: itemData,
-                    isDuplicate: isDuplicate,
-                    rarity: res.rarity,
-                    tokenAmount: tokenGained
+                        item: itemToReturn,
+                        isDuplicate: isDuplicate,
+                        rarity: res.rarity,
+                        tokenAmount: tokenGained
                 });
             }
 
