@@ -341,6 +341,42 @@ async function runMongoRegister(req, resp)
     }
 }
 
+async function runMongoGetPlayer(req, resp)
+{
+    try {
+        const url = new URL(req.url, `http://${req.headers.host}`)
+        const player_id = parseInt(url.searchParams.get("player_id"))
+
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior')
+
+        const collection = db.collection('player')
+
+        const user = await collection.findOne({ player_id: player_id })
+
+        if (user)
+        {
+            resp.write(JSON.stringify({
+                success: true,
+                data: user
+            }))
+        }
+        else
+        {
+            resp.write(JSON.stringify({ success: false }))
+        }
+
+        await dbconn.close()
+        resp.end()
+    }
+    catch (err)
+    {
+        console.error(err)
+        resp.write(JSON.stringify({ success: false }))
+        resp.end()
+    }
+}
+
 module.exports = {
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
@@ -356,5 +392,6 @@ module.exports = {
   runMongoAwShopType : awShopTypeMongo,
   runMongoAwStatus : awStatusMongo,
   runMongoLogin : runMongoLogin,
-  runMongoRegister : runMongoRegister
+  runMongoRegister : runMongoRegister,
+        runMongoGetPlayer : runMongoGetPlayer
 }
