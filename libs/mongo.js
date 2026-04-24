@@ -473,9 +473,11 @@ async function runMongoUpdateCharacter(req, resp) {
 async function runMongoGachaRoll(req, resp) {
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
+
     req.on('end', async () => {
         try {
             const data = JSON.parse(body);
+
             const playerId = parseInt(data.player_id);
             const caseId = parseInt(data.case_id);
             const rollCount = parseInt(data.count);
@@ -491,7 +493,7 @@ async function runMongoGachaRoll(req, resp) {
             });
 
             if (!ticket || ticket.quantity < rollCount) {
-                resp.write(JSON.stringify({ status: "error", message: "ticket_not_enough" }));
+                resp.write(JSON.stringify({ status: "error" }));
                 await dbconn.close();
                 resp.end();
                 return;
@@ -510,8 +512,7 @@ async function runMongoGachaRoll(req, resp) {
                 if (rollCount === 10 && i === 9 && !hasEpic) {
                     const epicPool = pool.filter(x => x.rarity >= 4);
                     selected = epicPool[Math.floor(Math.random() * epicPool.length)];
-                }
-                else {
+                } else {
                     let total = 0;
                     pool.forEach(p => total += p.percentage);
 
@@ -534,30 +535,31 @@ async function runMongoGachaRoll(req, resp) {
 
                 let isDup = false;
                 let tokenGain = 0;
+                let rarityValue = selected.rarity;
 
                 if (itemData.item_type_id === 2) {
 
                     const charData = await db.collection('character')
                         .findOne({ item_id: itemData.item_id });
-                
+
                     if (!charData) continue;
-                
+
+                    rarityValue = charData.rarity_id;
+
                     const exist = await db.collection('player_character').findOne({
                         player_id: playerId,
                         character_id: charData.character_id
                     });
-                
+
                     if (exist) {
                         isDup = true;
-                
                         tokenGain = charData.rarity_id * 5;
-                
+
                         await db.collection('player').updateOne(
                             { player_id: playerId },
                             { $inc: { token: tokenGain } }
                         );
-                    }
-                    else {
+                    } else {
                         await db.collection('player_character').insertOne({
                             player_id: playerId,
                             character_id: charData.character_id,
@@ -602,7 +604,7 @@ async function runMongoGachaRoll(req, resp) {
                 results.push({
                     item_id: selected.item_id,
                     item_type: itemData.item_type_id,
-                    rarity: itemData.item_type_id === 2 ? charData.rarity_id : selected.rarity,
+                    rarity: rarityValue,
                     is_duplicate: isDup,
                     token_amount: tokenGain
                 });
@@ -622,7 +624,7 @@ async function runMongoGachaRoll(req, resp) {
             resp.end();
 
         } catch (err) {
-            resp.write(JSON.stringify({ status: "error", message: err.message }));
+            resp.write(JSON.stringify({ status: "error" }));
             resp.end();
         }
     });
