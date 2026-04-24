@@ -475,69 +475,97 @@ async function runMongoGachaRoll(req, resp) {
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
-        const data = JSON.parse(body);
-        const playerId = parseInt(data.player_id);
-        const caseId = parseInt(data.case_id);
-        const rollCount = parseInt(data.count);
+        try {
+            const data = JSON.parse(body);
+            const playerId = parseInt(data.player_id);
+            const caseId = parseInt(data.case_id);
+            const rollCount = parseInt(data.count);
 
-        const dbconn = await MongoClient.connect(db_url, options);
-        const db = dbconn.db('arcwarrior');
+            const dbconn = await MongoClient.connect(db_url, options);
+            const db = dbconn.db('arcwarrior');
 
-        const inventory = await db.collection('player_inventory').findOne({ player_id: playerId, item_id: 14 })
-        if (!inventory || inventory.quantity < rollCount) {
-            resp.write(JSON.stringify({ status: "error", message: "Not enough tickets" }));
+            // 1. เช็คตั๋ว (สมมติไอดีตั๋วคือ 100)
+            const ticketId = 100; 
+            const inventory = await db.collection('inventory').findOne({ player_id: playerId, item_id: ticketId });
+            
+            if (!inventory || inventory.quantity < rollCount) {
+                resp.writeHead(400, { 'Content-Type': 'application/json' });
+                resp.write(JSON.stringify({ status: "error", message: "ตั๋วไม่พอ" }));
+                await dbconn.close();
+                resp.end();
+                return;
+            }
+
+            // 2. ดึงรายการของในตู้มาสุ่ม
+            const gachaItems = await db.collection('gacha_case_item').find({ case_id: caseId }).toArray();
+            const rollResults = [];
+
+            for (let i = 0; i < rollCount; i++) {
+                let total = 0;
+                gachaItems.forEach(item => total += item.percentage);
+                let roll = Math.random() * total;
+                let sum = 0;
+                let selected = gachaItems[0];
+
+                for (let item of gachaItems) {
+                    sum += item.percentage;
+                    if (roll <= sum) {
+                        selected = item;
+                        break;
+                    }
+                }
+
+                // เช็คข้อมูลไอเทมว่าเป็นตัวละครหรือไม่
+                const itemMaster = await db.collection('item').findOne({ item_id: selected.item_id });
+                let isDup = false;
+                let tAmount = 0;
+
+                if (itemMaster.item_type_id === 2) { // Type 2 = Character
+                    const hasChar = await db.collection('player_character').findOne({ 
+                        player_id: playerId, 
+                        character_id: itemMaster.character_id 
+                    });
+
+                    if (hasChar) {
+                        isDup = true;
+                        tAmount = selected.rarity * 5; // สูตรคำนวณ Token
+                        await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: tAmount } });
+                    } else {
+                        await db.collection('player_character').insertOne({ 
+                            player_id: playerId, 
+                            character_id: itemMaster.character_id, 
+                            level: 1, 
+                            tier: 0 
+                        });
+                    }
+                } else {
+                    // ถ้าเป็น Currency (Type 1)
+                    await db.collection('player').updateOne({ player_id: playerId }, { $inc: { gold: 100 } });
+                }
+
+                rollResults.push({
+                    item_id: selected.item_id,
+                    is_duplicate: isDup,
+                    token_amount: tAmount
+                });
+            }
+
+            // 3. หักตั๋ว
+            await db.collection('inventory').updateOne(
+                { player_id: playerId, item_id: ticketId }, 
+                { $inc: { quantity: -rollCount } }
+            );
+
+            resp.writeHead(200, { 'Content-Type': 'application/json' });
+            resp.write(JSON.stringify(rollResults));
             await dbconn.close();
             resp.end();
-            return;
+
+        } catch (err) {
+            resp.writeHead(500, { 'Content-Type': 'application/json' });
+            resp.write(JSON.stringify({ status: "error", message: err.message }));
+            resp.end();
         }
-
-        const gachaItems = await db.collection('gacha_case_item').find({ case_id: caseId }).toArray();
-        const results = [];
-
-        for (let i = 0; i < rollCount; i++) {
-            let total = 0;
-            gachaItems.forEach(item => total += item.percentage);
-            let roll = Math.random() * total;
-            let sum = 0;
-            let selected = gachaItems[0];
-
-            for (let item of gachaItems) {
-                sum += item.percentage;
-                if (roll <= sum) {
-                    selected = item;
-                    break;
-                }
-            }
-
-            const itemInfo = await db.collection('item').findOne({ item_id: selected.item_id });
-            let isDuplicate = false;
-            let rewardToken = 0;
-
-            if (itemInfo.item_type_id === 2) {
-                const hasChar = await db.collection('player_character').findOne({ player_id: playerId, character_id: itemInfo.character_id });
-                if (hasChar) {
-                    isDuplicate = true;
-                    rewardToken = selected.rarity * 5;
-                    await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: rewardToken } });
-                } else {
-                    await db.collection('player_character').insertOne({ player_id: playerId, character_id: itemInfo.character_id, level: 1, tier: 0 });
-                }
-            } else {
-                await db.collection('player').updateOne({ player_id: playerId }, { $inc: { gold: 100 } });
-            }
-
-            results.push({
-                item_id: selected.item_id,
-                is_duplicate: isDuplicate,
-                token_amount: rewardToken
-            });
-        }
-
-        await db.collection('player_inventory').updateOne({ player_id: playerId, item_id: 100 }, { $inc: { quantity: -rollCount } });
-        
-        resp.write(JSON.stringify(results));
-        await dbconn.close();
-        resp.end();
     });
 }
 
