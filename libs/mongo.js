@@ -443,7 +443,6 @@ async function runMongoGetPlayerCharacters(req, resp) {
     const dbconn = await MongoClient.connect(db_url, options);
     const db = dbconn.db('arcwarrior');
     
-    // ดึงเฉพาะตัวละครที่ player_id นี้เป็นเจ้าของ
     const characters = await db.collection('player_character').find({ player_id: playerId }).toArray();
     
     resp.write(JSON.stringify(characters));
@@ -484,8 +483,7 @@ async function runMongoGachaRoll(req, resp) {
             const dbconn = await MongoClient.connect(db_url, options);
             const db = dbconn.db('arcwarrior');
 
-            // 1. เช็คตั๋ว (สมมติไอดีตั๋วคือ 100)
-            const ticketId = 100; 
+            const ticketId = 14; 
             const inventory = await db.collection('inventory').findOne({ player_id: playerId, item_id: ticketId });
             
             if (!inventory || inventory.quantity < rollCount) {
@@ -496,7 +494,6 @@ async function runMongoGachaRoll(req, resp) {
                 return;
             }
 
-            // 2. ดึงรายการของในตู้มาสุ่ม
             const gachaItems = await db.collection('gacha_case_item').find({ case_id: caseId }).toArray();
             const rollResults = [];
 
@@ -515,12 +512,11 @@ async function runMongoGachaRoll(req, resp) {
                     }
                 }
 
-                // เช็คข้อมูลไอเทมว่าเป็นตัวละครหรือไม่
                 const itemMaster = await db.collection('item').findOne({ item_id: selected.item_id });
                 let isDup = false;
                 let tAmount = 0;
 
-                if (itemMaster.item_type_id === 2) { // Type 2 = Character
+                if (itemMaster.item_type_id === 2) {
                     const hasChar = await db.collection('player_character').findOne({ 
                         player_id: playerId, 
                         character_id: itemMaster.character_id 
@@ -528,7 +524,7 @@ async function runMongoGachaRoll(req, resp) {
 
                     if (hasChar) {
                         isDup = true;
-                        tAmount = selected.rarity * 5; // สูตรคำนวณ Token
+                        tAmount = selected.rarity * 5;
                         await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: tAmount } });
                     } else {
                         await db.collection('player_character').insertOne({ 
@@ -539,8 +535,7 @@ async function runMongoGachaRoll(req, resp) {
                         });
                     }
                 } else {
-                    // ถ้าเป็น Currency (Type 1)
-                    await db.collection('player').updateOne({ player_id: playerId }, { $inc: { gold: 100 } });
+                    await db.collection('player').updateOne({ player_id: playerId }, { $inc: { token: 1 } });
                 }
 
                 rollResults.push({
