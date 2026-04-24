@@ -555,6 +555,7 @@ async function runMongoGachaRoll(req, resp) {
                 if (itemData.item_type_id === 2) {
                     // ไปหา character_id จาก table character โดยใช้ item_id
                     const charData = await db.collection('character').findOne({ item_id: parseInt(itemData.item_id) });
+                    console.log("DEBUG DB RESULT:", charData);
                     
                     if (charData) {
                         itemToReturn.character_id = charData.character_id;
