@@ -451,6 +451,26 @@ async function runMongoGetPlayerCharacters(req, resp) {
     resp.end();
 }
 
+async function runMongoUpdateCharacter(req, resp) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        const data = JSON.parse(body);
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior');
+        
+        await db.collection('player_character').updateOne(
+            { player_id: parseInt(data.player_id), character_id: parseInt(data.character_id) },
+            { $set: { level: parseInt(data.level), tier: parseInt(data.tier) } },
+            { upsert: true }
+        );
+
+        resp.write(JSON.stringify({ status: "success" }));
+        await dbconn.close();
+        resp.end();
+    });
+}
+
 module.exports = {
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
@@ -471,5 +491,6 @@ module.exports = {
   runMongoGetInventory,
   runMongoUpdateCurrency,
   runMongoAddItem,
-  runMongoGetPlayerCharacters
+  runMongoGetPlayerCharacters,
+  runMongoUpdateCharacter
 }
