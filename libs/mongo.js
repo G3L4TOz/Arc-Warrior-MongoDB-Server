@@ -501,7 +501,6 @@ async function runMongoGachaRoll(req, resp) {
                 .find({ case_id: caseId }).toArray();
 
             const results = [];
-
             let hasEpic = false;
 
             for (let i = 0; i < rollCount; i++) {
@@ -528,9 +527,7 @@ async function runMongoGachaRoll(req, resp) {
                     }
                 }
 
-                if (selected.rarity >= 4) {
-                    hasEpic = true;
-                }
+                if (selected.rarity >= 4) hasEpic = true;
 
                 const itemData = await db.collection('item')
                     .findOne({ item_id: selected.item_id });
@@ -540,19 +537,21 @@ async function runMongoGachaRoll(req, resp) {
 
                 if (itemData.item_type_id === 2) {
 
+                    const charData = await db.collection('character')
+                        .findOne({ item_id: itemData.item_id });
+                
+                    if (!charData) continue;
+                
                     const exist = await db.collection('player_character').findOne({
                         player_id: playerId,
-                        character_id: itemData.character_id
+                        character_id: charData.character_id
                     });
-
+                
                     if (exist) {
                         isDup = true;
-
-                        const rarityData = await db.collection('rarity')
-                            .findOne({ rarity_id: itemData.rarity_id });
-
-                        tokenGain = rarityData.value * 5;
-
+                
+                        tokenGain = charData.rarity_id * 5;
+                
                         await db.collection('player').updateOne(
                             { player_id: playerId },
                             { $inc: { token: tokenGain } }
@@ -561,35 +560,37 @@ async function runMongoGachaRoll(req, resp) {
                     else {
                         await db.collection('player_character').insertOne({
                             player_id: playerId,
-                            character_id: itemData.character_id,
+                            character_id: charData.character_id,
                             level: 1,
                             tier: 0
                         });
                     }
                 }
+
                 else if (itemData.item_type_id === 1) {
 
-                    if (itemData.item_name === "gold") {
+                    if (itemData.item_name === "Gold") {
                         await db.collection('player').updateOne(
                             { player_id: playerId },
                             { $inc: { gold: 100 } }
                         );
                     }
 
-                    if (itemData.item_name === "diamond") {
+                    if (itemData.item_name === "Diamond") {
                         await db.collection('player').updateOne(
                             { player_id: playerId },
                             { $inc: { diamond: 10 } }
                         );
                     }
 
-                    if (itemData.item_name === "token") {
+                    if (itemData.item_name === "Token") {
                         await db.collection('player').updateOne(
                             { player_id: playerId },
                             { $inc: { token: 1 } }
                         );
                     }
                 }
+
                 else {
                     await db.collection('player_inventory').updateOne(
                         { player_id: playerId, item_id: selected.item_id },
@@ -601,7 +602,7 @@ async function runMongoGachaRoll(req, resp) {
                 results.push({
                     item_id: selected.item_id,
                     item_type: itemData.item_type_id,
-                    rarity: selected.rarity,
+                    rarity: itemData.item_type_id === 2 ? charData.rarity_id : selected.rarity,
                     is_duplicate: isDup,
                     token_amount: tokenGain
                 });
