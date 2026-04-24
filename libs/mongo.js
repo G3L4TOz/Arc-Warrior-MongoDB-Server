@@ -470,6 +470,123 @@ async function runMongoUpdateCharacter(req, resp) {
     });
 }
 
+async function runMongoGachaRoll(req, resp) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        const data = JSON.parse(body);
+        const { player_id, gacha_case_id, roll_count, ticket_item_name } = data;
+        
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior');
+
+        try {
+            // 1. เช็คตั๋วสุ่ม
+            const ticketItem = await db.collection('item').findOne({ item_name: ticket_item_name });
+            const playerTicket = await db.collection('player_inventory').findOne({ 
+                player_id: player_id, 
+                item_id: ticketItem.item_id 
+            });
+
+            if (!playerTicket || playerTicket.quantity < roll_count) {
+                resp.write(JSON.stringify({ success: false, message: "Not enough tickets" }));
+                return resp.end();
+            }
+
+            // 2. ดึงข้อมูลไอเทมในตู้สุ่ม
+            const pool = await db.collection('gacha_case_item').find({ gacha_case_id: gacha_case_id }).toArray();
+            const results = [];
+            let hasEpic = false;
+
+            // ฟังก์ชันสุ่มแบบถ่วงน้ำหนัก (Weighted Random)
+            const rollOne = (items) => {
+                const totalWeight = items.reduce((sum, i) => sum + i.percentage, 0);
+                let random = Math.random() * totalWeight;
+                for (const item of items) {
+                    if (random < item.percentage) return item;
+                    random -= item.percentage;
+                }
+                return items[0];
+            };
+
+            // 3. เริ่มการสุ่ม
+            const actualRolls = roll_count === 10 ? 9 : roll_count;
+            for (let i = 0; i < actualRolls; i++) {
+                const rolled = rollOne(pool);
+                if (rolled.rarity >= 3) hasEpic = true;
+                results.Add(rolled); // Note: ใน JS ใช้ push แต่เพื่อให้ตรง logic เดิมขอใช้ Array ปกติ
+                results.push(rolled);
+            }
+
+            // 4. ระบบการันตี (ถ้ากด 10 และยังไม่ได้ Epic)
+            if (roll_count === 10) {
+                if (!hasEpic) {
+                    const epicPool = pool.filter(i => i.rarity >= 3);
+                    results.push(epicPool[Math.floor(Math.random() * epicPool.length)]);
+                } else {
+                    results.push(rollOne(pool));
+                }
+            }
+
+            // 5. Process ของรางวัล & Update DB
+            const finalRewards = [];
+            for (const rolled of results) {
+                const itemData = await db.collection('item').findOne({ item_id: rolled.item_id });
+                let isDuplicate = false;
+                let rewardToken = 0;
+
+                if (itemData.item_type_id === 1) { // Currency
+                    await db.collection('player').updateOne({ player_id }, { $inc: { token: 1 } });
+                } 
+                else if (itemData.item_type_id === 2) { // Character
+                    const hasChar = await db.collection('player_character').findOne({ 
+                        player_id: player_id, 
+                        character_id: itemData.character_id 
+                    });
+
+                    if (!hasChar) {
+                        await db.collection('player_character').insertOne({
+                            player_id, character_id: itemData.character_id, level: 1, tier: 0
+                        });
+                    } else {
+                        isDuplicate = true;
+                        rewardToken = getWeightToken(rolled.rarity);
+                        await db.collection('player').updateOne({ player_id }, { $inc: { token: rewardToken } });
+                    }
+                }
+
+                finalRewards.push({
+                    item_id: itemData.item_id,
+                    item_name: itemData.item_name,
+                    is_duplicate: isDuplicate,
+                    token_gained: rewardToken,
+                    rarity: rolled.rarity
+                });
+            }
+
+            // 6. หักตั๋วสุ่ม
+            await db.collection('player_inventory').updateOne(
+                { player_id, item_id: ticketItem.item_id },
+                { $inc: { quantity: -roll_count } }
+            );
+
+            resp.write(JSON.stringify({ success: true, rewards: finalRewards }));
+
+        } catch (err) {
+            console.error(err);
+            resp.write(JSON.stringify({ success: false, error: err.message }));
+        } finally {
+            await dbconn.close();
+            resp.end();
+        }
+    });
+}
+
+function getWeightToken(rarity) {
+    const tokens = { 1: 1, 2: 2, 3: 5, 4: 10, 5: 20 };
+    return tokens[rarity] || 1;
+}
+
 module.exports = {
   runMongoAwCharacter : awCharacterMongo,
   runMongoAwElement : awElementMongo,
@@ -491,5 +608,7 @@ module.exports = {
   runMongoUpdateCurrency,
   runMongoAddItem,
   runMongoGetPlayerCharacters,
-  runMongoUpdateCharacter
+  runMongoUpdateCharacter,
+  runMongoGachaRoll,
+  getWeightToken
 }
