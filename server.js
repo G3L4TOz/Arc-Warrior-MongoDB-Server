@@ -94,6 +94,18 @@ function onClientRequest(req,resp)
         return
     }
 
+    else if(req.method === 'POST' && pathname === '/api/mongo/login')
+    {
+        mongo.runMongoLogin(req, resp)
+        return
+    }
+    
+    else if(req.method === 'POST' && pathname === '/api/mongo/register')
+    {
+        mongo.runMongoRegister(req, resp)
+        return
+    }
+
     else
     resp.write(JSON.stringify({messages: [
             '[Arc Warrior Mongo DB]'
