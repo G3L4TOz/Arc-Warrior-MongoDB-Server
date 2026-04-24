@@ -126,7 +126,7 @@ function onClientRequest(req,resp)
 
     else if(req.method === 'GET' && pathname === '/api/mongo/player/character')
     {
-        mongo.runMongoUpdateCharacter(req, resp)
+        mongo.runMongoGetPlayerCharacters(req, resp)
         return
     }
 
