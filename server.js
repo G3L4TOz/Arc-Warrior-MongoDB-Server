@@ -130,6 +130,12 @@ function onClientRequest(req,resp)
         return
     }
 
+    else if(req.method === 'GET' && pathname === '/api/mongo/character/update')
+    {
+        mongo.runMongoUpdateCharacter(req, resp)
+        return
+    }
+
     else
     resp.write(JSON.stringify({messages: [
             '[Arc Warrior Mongo DB]'
