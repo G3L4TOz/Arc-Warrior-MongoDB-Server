@@ -261,6 +261,58 @@ function getRequestBody(req)
     })
 }
 
+async function runMongoRegister(req, resp)
+{
+    try {
+        const body = await getRequestBody(req)
+
+        const dbconn = await MongoClient.connect(db_url, options);
+        const db = dbconn.db('arcwarrior')
+
+        const collection = db.collection('player')
+
+        // 🔍 เช็คซ้ำ
+        const existing = await collection.findOne({
+            $or: [
+                { username: body.username },
+                { nickname: body.nickname }
+            ]
+        })
+
+        if (existing)
+        {
+            resp.write(JSON.stringify({ success: false }))
+            await dbconn.close()
+            resp.end()
+            return
+        }
+
+        // 🎲 generate id
+        const player_id = Math.floor(100000000 + Math.random() * 900000000)
+
+        await collection.insertOne({
+            player_id: player_id,
+            username: body.username,
+            password: body.password,
+            nickname: body.nickname,
+            level: 0,
+            gold: 5000,
+            diamond: 200,
+            token: 0
+        })
+
+        resp.write(JSON.stringify({ success: true }))
+        await dbconn.close()
+        resp.end()
+    }
+    catch (err)
+    {
+        console.error(err)
+        resp.write(JSON.stringify({ success: false }))
+        resp.end()
+    }
+}
+
 module.exports = {
   runMongoTest : runMongo,
   runMongoAwCharacter : awCharacterMongo,
@@ -275,5 +327,7 @@ module.exports = {
   runMongoAwMonster : awMonsterMongo,
   runMongoAwShopItem : awShopItemMongo,
   runMongoAwShopType : awShopTypeMongo,
-  runMongoAwStatus : awStatusMongo
+  runMongoAwStatus : awStatusMongo,
+  runMongoLogin : runMongoLogin,
+  runMongoRegister : runMongoRegister
 }
