@@ -138,8 +138,8 @@ function onClientRequest(req,resp)
 
     else if(req.method === 'POST' && pathname === '/api/mongo/gacha/roll')
     {
-        mongo.runMongoGachaRoll(req, resp);
-        return;
+        mongo.runMongoGachaRoll(req, resp)
+        return
     }
 
     else
