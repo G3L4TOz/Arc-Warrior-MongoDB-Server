@@ -602,7 +602,7 @@ async function runMongoGachaRoll(req, resp) {
                     // ถ้าเป็น Currency (Token) ให้บวกเงินผู้เล่นตามความเหมาะสม
                     await db.collection('player').updateOne(
                         { player_id: parseInt(player_id) }, 
-                        { $inc: { gold: 100 } }
+                        { $inc: { token: 1 } }
                     );
                 }
 
