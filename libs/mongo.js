@@ -488,7 +488,6 @@ function weightedRandom(items) {
 
 // --- ฟังก์ชันหลักสำหรับเรียกจาก API ---
 async function runMongoGachaRoll(req, resp) {
-        let debugLogs = [];
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
@@ -536,6 +535,7 @@ async function runMongoGachaRoll(req, resp) {
 
             // 4. บันทึกผลและตรวจสอบของซ้ำ
             let finalRewards = [];
+            let debugLogs = [];
             for (let res of rolledResults) {
                 // บังคับหา item_id เป็นตัวเลข
                 const itemData = await db.collection('item').findOne({ item_id: parseInt(res.item_id) });
