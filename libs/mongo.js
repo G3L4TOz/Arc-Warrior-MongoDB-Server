@@ -496,7 +496,6 @@ async function runMongoGachaRoll(req, resp) {
         const db = dbconn.db('arcwarrior');
 
         try {
-            // 1. เช็คตั๋วสุ่ม
             const ticketItem = await db.collection('item').findOne({ item_name: ticket_item_name });
             if (!ticketItem) throw new Error("Ticket item not found");
 
@@ -510,12 +509,12 @@ async function runMongoGachaRoll(req, resp) {
                 return resp.end();
             }
 
-            // 2. ดึง Pool ไอเทมในตู้
-            const pool = await db.collection('gacha_case_item').find({ gacha_case_id: parseInt(gacha_case_id) }).toArray();
+            const pool = await db.collection('gacha_case_item')
+                .find({ gacha_case_id: parseInt(gacha_case_id) }).toArray();
+
             let rolledResults = [];
             let hasEpic = false;
 
-            // 3. เริ่มสุ่ม
             const countToRoll = roll_count === 10 ? 9 : roll_count;
             for (let i = 0; i < countToRoll; i++) {
                 let r = weightedRandom(pool);
@@ -523,7 +522,6 @@ async function runMongoGachaRoll(req, resp) {
                 rolledResults.push(r);
             }
 
-            // ระบบการันตี Epic สำหรับการสุ่ม 10 ครั้ง
             if (roll_count === 10) {
                 if (!hasEpic) {
                     const epicPool = pool.filter(x => x.rarity >= 3);
@@ -533,86 +531,92 @@ async function runMongoGachaRoll(req, resp) {
                 }
             }
 
-            // 4. บันทึกผลและตรวจสอบของซ้ำ
             let finalRewards = [];
             let debugLogs = [];
+
             for (let res of rolledResults) {
-                // บังคับหา item_id เป็นตัวเลข
-                const itemData = await db.collection('item').findOne({ item_id: parseInt(res.item_id) });
-                
+
+                const itemData = await db.collection('item')
+                    .findOne({ item_id: parseInt(res.item_id) });
+
                 if (!itemData) {
-                    console.error(`[GACHA] Error: Item ID ${res.item_id} not found in 'item' table!`);
+                    debugLogs.push(`[ERROR] Item ID ${res.item_id} not found`);
                     continue;
                 }
 
                 let isDuplicate = false;
                 let tokenGained = 0;
 
-                // ประกอบร่างข้อมูลพื้นฐาน (บังคับทุก ID เป็น Number)
                 let itemToReturn = {
                     item_id: parseInt(itemData.item_id),
                     item_name: itemData.item_name,
                     item_type_id: parseInt(itemData.item_type_id),
-                    rarity: parseInt(res.rarity), // ใช้ rarity จากตู้สุ่มเป็นค่าหลัก
+                    rarity: parseInt(res.rarity),
                     character_id: 0,
                     element_id: 0
                 };
 
-                // ตรวจสอบเงื่อนไขตัวละคร (เช็คได้ทั้งเลข 2 และสตริง "2")
+                // ===== CHARACTER =====
                 if (itemToReturn.item_type_id == 2) {
-                    // ค้นหาใน table character โดยใช้ item_id
-                    const charData = await db.collection('character').findOne({ 
-                        item_id: parseInt(itemToReturn.item_id) 
-                    });
-                    
+
+                    const charData = await db.collection('character')
+                        .findOne({ item_id: parseInt(itemToReturn.item_id) });
+
                     if (charData) {
-                        // ดึงค่าตามชื่อฟิลด์ใน MongoDB ของคุณเป๊ะๆ
                         itemToReturn.character_id = parseInt(charData.character_id);
                         itemToReturn.rarity = parseInt(charData.rarity_id);
                         itemToReturn.element_id = parseInt(charData.element_id);
-                        
-                        console.log(`[GACHA] Linked Success: ${itemToReturn.item_name} -> CharID: ${itemToReturn.character_id}`);
-                    } else {
-                        console.warn(`[GACHA] Found ItemType 2 but NO Data in 'character' table for ItemID: ${itemToReturn.item_id}`);
+
+                        debugLogs.push(`[LINK] ${itemToReturn.item_name} → CharID ${itemToReturn.character_id}`);
+                    } 
+                    else {
+                        debugLogs.push(`[WARN] No character data for item ${itemToReturn.item_id}`);
                     }
-            
-                    // เช็คของซ้ำ (ถ้ามี character_id แล้ว)
+
                     if (itemToReturn.character_id > 0) {
                         const existingChar = await db.collection('player_character').findOne({ 
                             player_id: parseInt(player_id), 
                             character_id: itemToReturn.character_id 
                         });
-                
+
                         if (existingChar) {
                             isDuplicate = true;
+
                             tokenGained = getWeightToken(itemToReturn.rarity);
+
                             await db.collection('player').updateOne(
-                                { player_id: parseInt(player_id) }, 
+                                { player_id: parseInt(player_id) },
                                 { $inc: { token: tokenGained } }
-                                debugLogs.push(`[DUPLICATE] CharID ${itemToReturn.character_id} → +${tokenGained} token`);
                             );
+
+                            debugLogs.push(`[DUPLICATE] CharID ${itemToReturn.character_id} → +${tokenGained} token`);
                         } 
-                        else 
-                        {
+                        else {
                             await db.collection('player_character').insertOne({ 
-                                player_id: parseInt(player_id), 
-                                character_id: itemToReturn.character_id, 
-                                level: 1, 
-                                tier: 0 
+                                player_id: parseInt(player_id),
+                                character_id: itemToReturn.character_id,
+                                level: 1,
+                                tier: 0
                             });
+
+                            debugLogs.push(`[NEW] Character ${itemToReturn.character_id} added`);
                         }
                     }
-                } 
-                else if (itemToReturn.item_type_id == 1) 
-                {
-                    tokenGained = 1; // 👈 สำคัญ!!!
-                    
+                }
+
+                // ===== TOKEN ITEM =====
+                else if (itemToReturn.item_type_id == 1) {
+
+                    tokenGained = 1;
+
                     await db.collection('player').updateOne(
-                        { player_id: parseInt(player_id) }, 
+                        { player_id: parseInt(player_id) },
                         { $inc: { token: tokenGained } }
                     );
-                        debugLogs.push(`[TOKEN] Player ${player_id} gained ${tokenGained} (ItemType ${itemToReturn.item_type_id})`);
+
+                    debugLogs.push(`[TOKEN] +${tokenGained} (Item ${itemToReturn.item_name})`);
                 }
+
                 finalRewards.push({
                     item: itemToReturn,
                     isDuplicate: isDuplicate,
@@ -621,18 +625,17 @@ async function runMongoGachaRoll(req, resp) {
                 });
             }
 
-            // 5. หักตั๋วสุ่ม
             await db.collection('player_inventory').updateOne(
                 { player_id: parseInt(player_id), item_id: ticketItem.item_id },
                 { $inc: { quantity: -roll_count } }
             );
 
-            // ส่งข้อมูลทั้งหมดกลับไปที่ Unity
-            resp.write(JSON.stringify({ 
-                    success: true, 
-                    data: finalRewards,
-                    logs: debugLogs
-                }));
+            resp.write(JSON.stringify({
+                success: true,
+                data: finalRewards,
+                logs: debugLogs
+            }));
+
         } catch (err) {
             console.error("[Gacha API Error]:", err);
             resp.write(JSON.stringify({ success: false, message: err.message }));
