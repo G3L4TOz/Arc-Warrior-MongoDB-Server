@@ -589,7 +589,9 @@ async function runMongoGachaRoll(req, resp) {
                                 { player_id: parseInt(player_id) }, 
                                 { $inc: { token: tokenGained } }
                             );
-                        } else {
+                        } 
+                        else 
+                        {
                             await db.collection('player_character').insertOne({ 
                                 player_id: parseInt(player_id), 
                                 character_id: itemToReturn.character_id, 
@@ -598,11 +600,12 @@ async function runMongoGachaRoll(req, resp) {
                             });
                         }
                     }
-                } else if (itemToReturn.item_type_id == 1) {
-                    // ถ้าเป็น Currency (Token) ให้บวกเงินผู้เล่นตามความเหมาะสม
+                } 
+                else if (itemToReturn.item_type_id == 1) 
+                {
                     await db.collection('player').updateOne(
                         { player_id: parseInt(player_id) }, 
-                        { $inc: { token: 1 } }
+                        { $inc: { token: +1 } }
                     );
                 }
 
