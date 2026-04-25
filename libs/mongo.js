@@ -488,6 +488,7 @@ function weightedRandom(items) {
 
 // --- ฟังก์ชันหลักสำหรับเรียกจาก API ---
 async function runMongoGachaRoll(req, resp) {
+        let debugLogs = [];
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
@@ -588,6 +589,7 @@ async function runMongoGachaRoll(req, resp) {
                             await db.collection('player').updateOne(
                                 { player_id: parseInt(player_id) }, 
                                 { $inc: { token: tokenGained } }
+                                debugLogs.push(`[DUPLICATE] CharID ${itemToReturn.character_id} → +${tokenGained} token`);
                             );
                         } 
                         else 
@@ -609,7 +611,7 @@ async function runMongoGachaRoll(req, resp) {
                         { player_id: parseInt(player_id) }, 
                         { $inc: { token: tokenGained } }
                     );
-                        console.log(`[TOKEN DEBUG] Player ${player_id} gained ${tokenGained}`);
+                        debugLogs.push(`[TOKEN] Player ${player_id} gained ${tokenGained} (ItemType ${itemToReturn.item_type_id})`);
                 }
                 finalRewards.push({
                     item: itemToReturn,
@@ -626,8 +628,11 @@ async function runMongoGachaRoll(req, resp) {
             );
 
             // ส่งข้อมูลทั้งหมดกลับไปที่ Unity
-            resp.write(JSON.stringify({ success: true, data: finalRewards }));
-
+            resp.write(JSON.stringify({ 
+                    success: true, 
+                    data: finalRewards,
+                    logs: debugLogs
+                }));
         } catch (err) {
             console.error("[Gacha API Error]:", err);
             resp.write(JSON.stringify({ success: false, message: err.message }));
