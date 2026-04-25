@@ -584,7 +584,7 @@ async function runMongoGachaRoll(req, resp) {
                 
                         if (existingChar) {
                             isDuplicate = true;
-                            tokenGained = getWeightToken(res.rarity);
+                            tokenGained = getWeightToken(itemToReturn.rarity);
                             await db.collection('player').updateOne(
                                 { player_id: parseInt(player_id) }, 
                                 { $inc: { token: tokenGained } }
@@ -603,12 +603,14 @@ async function runMongoGachaRoll(req, resp) {
                 } 
                 else if (itemToReturn.item_type_id == 1) 
                 {
+                    tokenGained = 1; // 👈 สำคัญ!!!
+                    
                     await db.collection('player').updateOne(
                         { player_id: parseInt(player_id) }, 
-                        { $inc: { token: +1 } }
+                        { $inc: { token: tokenGained } }
                     );
+                        console.log(`[TOKEN DEBUG] Player ${player_id} gained ${tokenGained}`);
                 }
-
                 finalRewards.push({
                     item: itemToReturn,
                     isDuplicate: isDuplicate,
